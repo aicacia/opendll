@@ -1,0 +1,79 @@
+import { ManyToMany, HasMany, HasOne, BelongsTo  } from '@opendata/core'
+
+// RBAC
+
+node Role {
+  @key
+  name string
+
+  @relationship(ManyToMany<Self, Permission>)
+  permissions
+}
+
+enum PermissionName {
+  UsersRead = "users:read"
+  Admin = "admin"
+}
+
+node Permission {
+  @key
+  name PermissionName
+
+  @relationship(ManyToMany<Self, Role>)
+  roles
+}
+
+global {
+  current_user? User
+}
+
+// Application Types
+
+@access({
+  read: current_user?.id === self.id || current_user?.role.permissions.some(p => p.name == PermissionName.UsersRead)
+  write: current_user?.id === self.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
+  delete: current_user?.id === self.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
+})
+node User {
+  @key
+  id usize
+
+  name string
+  created_at DateTime
+  updated_at DateTime 
+
+  @relationship(HasOne<Self, Role>)
+  role
+
+  @relationship(HasMany<Self, Todo>)
+  @access({
+    read: current_user?.id === self.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
+    write: current_user?.id === self.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
+    delete: current_user?.id === self.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
+  })
+  todos
+}
+
+@access({
+  read: current_user?.id === self.user.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
+  write: current_user?.id === self.user.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
+  delete: current_user?.id === self.user.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
+})
+node Todo {
+  @key
+  id usize
+
+  title string
+  description string
+  completed bool
+  created_at DateTime
+  updated_at DateTime 
+
+  @relationship(BelongsTo<Self, User>)
+  @access({
+    read: current_user?.id === self.user.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
+    write: current_user?.id === self.user.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
+    delete: current_user?.id === self.user.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
+  })
+  user
+}
