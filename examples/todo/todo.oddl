@@ -47,10 +47,10 @@ node Role: Timestamped {
   name: string
 
   @has_assignments()
-  users: Set<User>
+  users: Array<User>
 
   @has_assignments()
-  permissions: Set<Permission>
+  permissions: Array<Permission>
 }
 policy [read, write, delete] for Role where context.user?.is_admin()
 
@@ -59,7 +59,7 @@ node Permission: Timestamped {
   name: Permissions
 
   @assigned_to()
-  roles: Set<Role>
+  roles: Array<Role>
 }
 policy [read, write, delete] for Permission where context.user?.is_admin()
 
@@ -67,20 +67,22 @@ node User: AutoId + Timestamped {
   name: string
 
   @assigned_to()
-  roles: Set<Role>
+  roles: Array<Role>
 
   @owns()
-  todos: Set<Todo>
+  todos: Array<Todo>
 
-  fn is_admin(self) -> bool {
-    self.roles.some(r => 
-      r.permissions.some(p => p.name == Permissions.AdminAll)
-    )
+  subquery is_admin(self): bool {
+    self.has_permission(Permissions.AdminAll)
   }
 
-  fn has_permission(self, permission Permissions) -> bool {
+  subquery has_permission(self, permission: Permissions): bool {
+    self.has_permissions([permission])
+  }
+
+  subquery has_permissions(self, permissions: Array<Permissions>): bool {
     self.roles.some(r => 
-      r.permissions.some(p => p.name == permission)
+      r.permissions.some(p => permissions.has(p.name))
     )
   }
 }
