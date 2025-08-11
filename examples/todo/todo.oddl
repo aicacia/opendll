@@ -13,14 +13,9 @@ trait Timestamped {
   updated_at: DateTime = DateTime.now()
 }
 
-@policy(
-  read: context.user?.is_admin() || context.user?.id == from.id,
-  write: context.user?.is_admin() || context.user?.id == from.id,
-  delete: context.user?.is_admin() || context.user?.id == from.id
-)
-edge owns<Object> { 
-  from: User
-  to: Object
+edge owns<A, B> { 
+  from: A
+  to: B
   constraints: {
     multiple_from: false // One owner per Object
     multiple_to: true    // Multiple objects per owner
@@ -28,12 +23,9 @@ edge owns<Object> {
     inverse: [owned_by]
   }
 }
+policy [read, write, delete] for owns<User, Any> where context.user?.is_admin() || context.user?.id == from.id
+policy [read, write, delete] for owns<Any, Any> where context.user?.is_admin()
 
-@policy(
-  read: context.user?.is_admin(),
-  write: context.user?.is_admin(),
-  delete: context.user?.is_admin()
-)
 edge assigned_to<A, B> {
   from: A
   to: B
@@ -43,17 +35,13 @@ edge assigned_to<A, B> {
     inverse: [has_assignments]
   }
 }
+policy [read, write, delete] for assigned_to<Any, Any> where context.user?.is_admin()
 
 enum Permissions {
   UsersRead = "users:read"
   AdminAll = "admin:*"
 }
 
-@policy(
-  read: context.user?.is_admin()
-  write: context.user?.is_admin()
-  delete: context.user?.is_admin()
-)
 node Role: Timestamped {
   @primary_key
   name: string
@@ -64,12 +52,8 @@ node Role: Timestamped {
   @has_assignments()
   permissions: Set<Permission>
 }
+policy [read, write, delete] for Role where context.user?.is_admin()
 
-@policy(
-  read: context.user?.is_admin()
-  write: context.user?.is_admin()
-  delete: context.user?.is_admin()
-)
 node Permission: Timestamped {
   @primary_key
   name: Permissions
@@ -77,12 +61,8 @@ node Permission: Timestamped {
   @assigned_to()
   roles: Set<Role>
 }
+policy [read, write, delete] for Permission where context.user?.is_admin()
 
-@policy(
-  read: context.user?.is_admin() || context.user?.id  == self.id
-  write: context.user?.is_admin() || context.user?.id  == self.id
-  delete: context.user?.is_admin() || context.user?.id  == self.id
-)
 node User: AutoId + Timestamped {
   name: string
 
@@ -104,12 +84,8 @@ node User: AutoId + Timestamped {
     )
   }
 }
+policy [read, write, delete] for User where context.user?.is_admin() || context.user?.id == self.id
 
-@policy(
-  read: context.user?.is_admin() || context.user?.id == self.user.id
-  write: context.user?.is_admin() || context.user?.id == self.user.id
-  delete: context.user?.is_admin() || context.user?.id == self.user.id
-)
 node Todo: AutoId + Timestamped {
   title: string
   description: string?
@@ -118,3 +94,4 @@ node Todo: AutoId + Timestamped {
   @owned_by()
   user: User
 }
+policy [read, write, delete] for User where context.user?.is_admin() || context.user?.id == self.user.id
