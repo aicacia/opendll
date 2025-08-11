@@ -1,79 +1,83 @@
-import { ManyToMany, HasMany, HasOne, BelongsTo  } from '@opendata/core'
-
-// RBAC
-
-node Role {
-  @key
-  name string
-
-  @relationship(ManyToMany<Self, Permission>)
-  permissions
+edge owns<Owner, Ownable> {
+  from: Owner
+  to: Ownable
+  constraints: {
+    functional_to: true // One owner per to object
+    required_to: false  // make ownership mandatory for Ownable objects
+    on_delete: cascade  // deletion behavior i.e. cascade or null
+  }
 }
 
-enum PermissionName {
+edge owned inverses owns {}
+
+edge assigned_to<A, B> {
+  from: A
+  to: B
+  constraints: { 
+    functional_to: true 
+  }
+}
+
+edge has_assignment inverses assigned_to {}
+
+node Role {
+  @primary_key
+  name: string
+
+  @has_assignment()
+  permissions: Set<Permission>
+}
+
+enum Permissions {
   UsersRead = "users:read"
   Admin = "admin"
 }
 
 node Permission {
-  @key
-  name PermissionName
+  @primary_key
+  name: Permissions
 
-  @relationship(ManyToMany<Self, Role>)
-  roles
+  @assigned_to()
+  roles: Set<Role>
 }
 
-global {
-  current_user? User
-}
-
-// Application Types
-
-@access({
-  read: current_user?.id === self.id || current_user?.role.permissions.some(p => p.name == PermissionName.UsersRead)
-  write: current_user?.id === self.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
-  delete: current_user?.id === self.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
-})
 node User {
-  @key
-  id usize
+  @primary_key
+  id: usize
 
-  name string
-  created_at DateTime
-  updated_at DateTime 
+  name: string
 
-  @relationship(HasOne<Self, Role>)
-  role
+  created_at: DateTime
+  updated_at: DateTime 
 
-  @relationship(HasMany<Self, Todo>)
-  @access({
-    read: current_user?.id === self.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
-    write: current_user?.id === self.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
-    delete: current_user?.id === self.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
-  })
-  todos
+  @assigned_to
+  roles: Set<Role>
+
+  @owns
+  todos: Set<Todo>
+
+  fn is_admin(user? User) -> bool {
+    if user == null {
+      return false
+    }
+    user.role.permissions.some(p => p.name == Permissions.Admin)
+  }
+
+  fn has_permission(self, permission Permissions) -> bool {
+    user.role.permissions.some(p => p.name == permission)
+  }
 }
 
-@access({
-  read: current_user?.id === self.user.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
-  write: current_user?.id === self.user.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
-  delete: current_user?.id === self.user.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
-})
 node Todo {
-  @key
-  id usize
+  @primary_key
+  id: usize
 
-  title string
-  description string
-  completed bool
-  created_at DateTime
-  updated_at DateTime 
+  title: string
+  description: string?
+  completed: bool
+  created_at: DateTime
+  updated_at: DateTime 
 
-  @relationship(BelongsTo<Self, User>)
-  @access({
-    read: current_user?.id === self.user.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
-    write: current_user?.id === self.user.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
-    delete: current_user?.id === self.user.id || current_user?.role.permissions.some(p => p.name == PermissionName.Admin)
-  })
-  user
+  @owned_by()
+  user: User
 }
