@@ -1,1 +1,1 @@
-# OpenData
+# OpenDDL (.oddl)

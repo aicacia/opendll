@@ -1,0 +1,120 @@
+context {
+  user: User? // null if unauthenticated
+}
+
+trait AutoId {
+  @primary_key
+  id: usize = autoid()
+}
+
+trait Timestamped {
+  created_at: DateTime = DateTime.now()
+  @event("node:write", updated_at = DateTime.now())
+  updated_at: DateTime = DateTime.now()
+}
+
+@policy(
+  read: context.user?.is_admin() || context.user?.id == from.id,
+  write: context.user?.is_admin() || context.user?.id == from.id,
+  delete: context.user?.is_admin() || context.user?.id == from.id
+)
+edge owns<Object> { 
+  from: User
+  to: Object
+  constraints: {
+    multiple_from: false // One owner per Object
+    multiple_to: true    // Multiple objects per owner
+    on_delete: cascade   // Cascade deletion
+    inverse: [owned_by]
+  }
+}
+
+@policy(
+  read: context.user?.is_admin(),
+  write: context.user?.is_admin(),
+  delete: context.user?.is_admin()
+)
+edge assigned_to<A, B> {
+  from: A
+  to: B
+  constraints: {
+    multiple_from: true // Multiple assignments per "from"
+    multiple_to: true   // Multiple assignments per "to"
+    inverse: [has_assignments]
+  }
+}
+
+enum Permissions {
+  UsersRead = "users:read"
+  AdminAll = "admin:*"
+}
+
+@policy(
+  read: context.user?.is_admin()
+  write: context.user?.is_admin()
+  delete: context.user?.is_admin()
+)
+node Role: Timestamped {
+  @primary_key
+  name: string
+
+  @has_assignments()
+  users: Set<User>
+
+  @has_assignments()
+  permissions: Set<Permission>
+}
+
+@policy(
+  read: context.user?.is_admin()
+  write: context.user?.is_admin()
+  delete: context.user?.is_admin()
+)
+node Permission: Timestamped {
+  @primary_key
+  name: Permissions
+
+  @assigned_to()
+  roles: Set<Role>
+}
+
+@policy(
+  read: context.user?.is_admin() || context.user?.id  == self.id
+  write: context.user?.is_admin() || context.user?.id  == self.id
+  delete: context.user?.is_admin() || context.user?.id  == self.id
+)
+node User: AutoId + Timestamped {
+  name: string
+
+  @assigned_to()
+  roles: Set<Role>
+
+  @owns()
+  todos: Set<Todo>
+
+  fn is_admin(self) -> bool {
+    self.roles.some(r => 
+      r.permissions.some(p => p.name == Permissions.AdminAll)
+    )
+  }
+
+  fn has_permission(self, permission Permissions) -> bool {
+    self.roles.some(r => 
+      r.permissions.some(p => p.name == permission)
+    )
+  }
+}
+
+@policy(
+  read: context.user?.is_admin() || context.user?.id == self.user.id
+  write: context.user?.is_admin() || context.user?.id == self.user.id
+  delete: context.user?.is_admin() || context.user?.id == self.user.id
+)
+node Todo: AutoId + Timestamped {
+  title: string
+  description: string?
+  completed: bool = false
+
+  @owned_by()
+  user: User
+}
