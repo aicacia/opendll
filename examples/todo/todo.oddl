@@ -24,7 +24,7 @@ edge owns<A, B> {
   }
 }
 policy [read, write, delete] for owns<User, Any> where context.user?.is_admin() || context.user?.id == from.id
-policy [read, write, delete] for owns<Any, Any> where context.user?.is_admin()
+policy [create, read, write, delete] for owns<Any, Any> where context.user?.is_admin()
 
 edge assigned_to<A, B> {
   from: A
@@ -35,10 +35,9 @@ edge assigned_to<A, B> {
     inverse: [has_assignments]
   }
 }
-policy [read, write, delete] for assigned_to<Any, Any> where context.user?.is_admin()
+policy [create, read, write, delete] for assigned_to<Any, Any> where context.user?.is_admin()
 
 enum Permissions {
-  UsersRead = "users:read"
   AdminAll = "admin:*"
 }
 
@@ -52,7 +51,7 @@ node Role: Timestamped {
   @has_assignments()
   permissions: Array<Permission>
 }
-policy [read, write, delete] for Role where context.user?.is_admin()
+policy [create, read, write, delete] for Role where context.user?.is_admin()
 
 node Permission: Timestamped {
   @primary_key
@@ -61,7 +60,7 @@ node Permission: Timestamped {
   @assigned_to()
   roles: Array<Role>
 }
-policy [read, write, delete] for Permission where context.user?.is_admin()
+policy [create, read, write, delete] for Permission where context.user?.is_admin()
 
 node User: AutoId + Timestamped {
   name: string
@@ -87,6 +86,7 @@ node User: AutoId + Timestamped {
   }
 }
 policy [read, write, delete] for User where context.user?.is_admin() || context.user?.id == self.id
+policy [create] for User where context.user?.is_admin()
 
 node Todo: AutoId + Timestamped {
   title: string
@@ -96,4 +96,5 @@ node Todo: AutoId + Timestamped {
   @owned_by()
   user: User
 }
-policy [read, write, delete] for User where context.user?.is_admin() || context.user?.id == self.user.id
+policy [read, write, delete] for Todo where context.user?.is_admin() || context.user?.id == self.user.id
+policy [create] for Todo where context.user?.is_admin()
